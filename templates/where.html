@@ -20,6 +20,21 @@
             <div class="input submit">
                 <input type="submit" value="Submit" />
             </div>
+
+
+         {% if sunmaxalt != None %}
+
+              <h2>Sun Altitude during the year</h2>
+            <img src="data:image/png;base64,{{ sunmaxalt }}">
+        {% endif %}
+
+       {% if sunriseset != None %}
+
+              <h2>Sun Rise and setting times during the year</h2>
+            <img src="data:image/png;base64,{{ sunriseset }}">
+        {% endif %}
+
+
         </form>
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
