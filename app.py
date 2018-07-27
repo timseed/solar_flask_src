@@ -95,56 +95,12 @@ def where():
         where_lon = request.form['where_lon']
 
         if form.validate():
-            ## Save the comment here.
-            flash('Lat ' + str(where_lat) + "Lon " + str(where_lon))
-            date = datetime(2016, 7, 18, 0, 0, 0)
-            sec_per_year = 3600 * 24 * 365
-            tz_offset = 4 * 60 * 60
-
-            obs = ephem.Observer()
-
-            flash('Created Observer')
-            # Telepayong
-            obs.lat = '15:20'
-            obs.long = '120:40'
-            old_mon = -1
-            sun_angle_data = []
-            sun_rise_set_data = []
-            sun_angle_data.append(("when", "angle", "azimuth"))
-            #sun_rise_set_data.append(("when", "rise_bearing", "set_bearing"))
-            #flash('Generating Data')
-            for s in range(0, 3600 * 24 * 365, 600):
-                stime = date + timedelta(seconds=s)
-                obs.date = stime
-
-                sun = ephem.Sun(obs)
-                sun.compute(obs)
-
-                localtime = stime + timedelta(seconds=tz_offset)
-                sun_angle = float(sun.alt) * 57.2957795  # Convert Radians to degrees
-                sun_bearing = float(sun.az) * 57.2957795  # Convert Radians to degrees
-                if sun_angle < 0:
-                    sun_angle = 0
-                if sun_angle > 10.0:
-                    junk = 1
-                # if s % 7200 == 0:
-                #    print(str.format('{},{:04.1f},{:04.1f}', localtime.strftime("%Y-%m-%d %H:%M:%S"),
-                #                     sun_angle, sun_bearing), end='\n')
-                sun_angle_data.append((localtime.strftime("%Y-%m-%d %H:%M:%S"), sun_angle, sun_bearing))
-
-            flash('Writing Data')
-            #dill.dump(sun_angle_data, open("year.data", "wb"))
-            #sun_angle_data = pickle.load(open("year.data", "rb"))
-
-            df = pd.DataFrame(sun_angle_data[1:], columns=sun_angle_data[0])
-
-
-
             # Telepayong
             obs = ephem.Observer()
             obs.lat = '15:20'
             obs.long = '120:40'
             sun_rise_set_data = {}
+            sun_max_alt_data = {}
 
             # Make time gmt +9 i.e. PDT
             date = datetime(2016, 7, 18, 9, 0, 0)
@@ -154,44 +110,25 @@ def where():
                 obs.date = newday
                 sun = ephem.Sun(obs)
                 sun.compute(obs)
+                max_alt = 0
+                try:
+                    max_alt = degrees(sun.transit_alt)
+                except:
+                    pass
                 sun_rise_set_data[newday.strftime("%Y-%m-%d %H:%M:%S")] = {"rise": degrees(sun.rise_az),
-                                                                           "set": degrees(sun.set_az)}
+                                                                           "set": degrees(sun.set_az),
+                                                                           }
+                sun_max_alt_data[newday.strftime("%Y-%m-%d %H:%M:%S")] = {"max_alt": max_alt}
+
             df_sun_rise_set_week = pd.DataFrame.from_dict(sun_rise_set_data, orient='index')
             df_sun_rise_set_week['Mean_Rise'] = df_sun_rise_set_week.rise.mean()
             df_sun_rise_set_week['Mean_Set'] = df_sun_rise_set_week.set.mean()
-            #Make Index DateTime aware
-            df_sun_rise_set_week.index = pd.DatetimeIndex(df_sun_rise_set_week.index)
 
-            def make_date_time(x):
-                try:
-                    rv = datetime.strptime(str(x), '%Y-%m-%d %H:%M:%S')
-                except:
-                    rv = datetime(1990, 1, 1, 1, 1)
-                return rv
+            df_sun_max_alt_data = pd.DataFrame.from_dict(sun_max_alt_data, orient='index')
 
-            flash("Create DateTime Column")
-            df['DT'] = df.when.apply(make_date_time)
-            flash("Drop unused column")
-            df.drop(['when'], axis=1, inplace=True)
-            # print("Set Index to DateTime Column")
-            df.set_index(df.DT, drop=True, inplace=True)
-            flash("Initial Calcs done")
-            # Remote the times when the sum has not risen more than 5 Degrees
-            df = df[df.angle > 5]
-            flash("Removed angle < 5")
-            angle_ser = pd.Series(df.angle, index=df.DT)
-            az_ser = pd.Series(df.azimuth, index=df.DT)
-            flash("Creating some Series")
-            week_max_angle = angle_ser.resample('W').max()
 
-            week_max_az = az_ser.resample('W').max()
-            flash('Create Data Frames')
-            df_week_max_angle = pd.DataFrame.from_dict(week_max_angle.to_dict(),
-                                                       orient='index', columns=['max_angle'])
-
-            flash('DF Finished')
-            sunmaxalt2 = plot_to_b64png(df_week_max_angle.plot())
-            sunriseset2 = plot_to_b64png(df_sun_rise_set_week.plot())
+            sunmaxalt2 = plot_to_b64png(df_sun_rise_set_week.plot())
+            sunriseset2 = plot_to_b64png(df_sun_max_alt_data.plot())
 
         else:
             flash('All the form fields are required. ')
