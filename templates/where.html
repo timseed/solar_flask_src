@@ -21,6 +21,11 @@
                 <input type="submit" value="Submit" />
             </div>
 
+        {% if mean_sun_height != None and mean_sun_angle != None%}
+            <h2> Mean Angle and bearing </h2>
+            <h4> Mean Sun height is calculated as {{ mean_sun_height }} degrees.</h4>
+            <h4> Mean Sun bearing is calculated as {{ mean_sun_angle }} degrees.</h4>
+        {% endif %}
 
          {% if sunmaxalt != None %}
 

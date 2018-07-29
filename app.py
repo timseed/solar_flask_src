@@ -8,7 +8,8 @@ import pandas as pd
 from matplotlib import pyplot
 import base64
 import io
-from math import degrees
+from math import degrees, sin,radians
+
 
 app = Flask(__name__)
 
@@ -22,6 +23,12 @@ class ReusableForm(Form):
     where_lon = StringField('Lonitude:', validators=[validators.required()])
     where_lon.data = "120.40"
     where_lat.data = "15:20"
+
+
+def SolarDeclination(days_in_year):
+    " 81st day - Spring Equinox should yield 0"
+    SolarDeclination = 23.45 * sin(radians((360 / 365) * (284 + 81)))
+    return SolarDeclination
 
 
 def calc():
@@ -89,6 +96,8 @@ def where():
     res = {}
     sunmaxalt2 = None
     sunriseset2 = None
+    mean_sun_height = None
+    mean_sun_angle = None
 
     if request.method == 'POST':
         where_lat = request.form['where_lat']
@@ -126,6 +135,8 @@ def where():
 
             df_sun_max_alt_data = pd.DataFrame.from_dict(sun_max_alt_data, orient='index')
 
+            mean_sun_height = df_sun_max_alt_data.max_alt.mean()
+            mean_sun_angle = df_sun_rise_set_week.rise.mean() + df_sun_rise_set_week.set.mean()
 
             sunmaxalt2 = plot_to_b64png(df_sun_rise_set_week.plot())
             sunriseset2 = plot_to_b64png(df_sun_max_alt_data.plot())
@@ -136,7 +147,9 @@ def where():
     return render_template('where.html', form=form,
                            where_lat=res,
                            sunmaxalt=sunmaxalt2,
-                           sunriseset=sunriseset2)
+                           sunriseset=sunriseset2,
+                           mean_sun_angle=int(mean_sun_angle),
+                           mean_sun_height=int(mean_sun_height))
 
 
 if __name__ == '__main__':
