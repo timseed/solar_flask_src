@@ -17,28 +17,33 @@
                 {{ form.where_lon.label }} {{ form.where_lon }}
             </div>
 
+        <div class="input Query">
+                {{ form.solar_angle.label }} {{ form.solar_angle }}
+            </div>
+
             <div class="input submit">
                 <input type="submit" value="Submit" />
             </div>
 
-        {% if mean_sun_height != None and mean_sun_angle != None%}
-            <h2> Mean Angle and bearing </h2>
-            <h4> Mean Sun height is calculated as {{ mean_sun_height }} degrees.</h4>
-            <h4> Mean Sun bearing is calculated as {{ mean_sun_angle }} degrees.</h4>
+
+         {% if data != None %}
+             <h2>Fixed Solar Panel Calculations</h2>
+            {%  for k, v in data.items() %}
+
+                {%  if v["angle"] != None %}
+                    <br>
+                    <div style="text-align:center">
+                        For an angle of {{ v["angle"] }} degrees.
+                        <p>Average Efficiency is {{ v["yearavg"] }} %
+                        </p>
+
+
+                    <img src="data:image/png;base64,{{ v["yeardf"] }}">
+                     </div>
+
+                {%  endif %}
+             {% endfor %}
         {% endif %}
-
-         {% if sunmaxalt != None %}
-
-              <h2>Sun Altitude during the year</h2>
-            <img src="data:image/png;base64,{{ sunmaxalt }}">
-        {% endif %}
-
-       {% if sunriseset != None %}
-
-              <h2>Sun Rise and setting times during the year</h2>
-            <img src="data:image/png;base64,{{ sunriseset }}">
-        {% endif %}
-
 
         </form>
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -50,4 +55,5 @@
                 </ul>
             {% endif %}
         {% endwith %}
+    </body>
 </html>
