@@ -3,12 +3,10 @@ from wtforms import Form, TextField, TextAreaField, validators, StringField, Sub
 import dill
 import base64
 import io
-from math import degrees, sin,radians
+from math import sin,cos, radians
 from datetime import datetime, timedelta
-from pytz import timezone
-import pandas as pd
 import ephem
-from math import degrees, cos, radians
+
 
 app = Flask(__name__)
 
@@ -20,7 +18,6 @@ app.config['SECRET_KEY'] = '7d441f27d441f27567d441111116a'
 class ReusableForm(Form):
     where_lat = StringField('Latitude:', validators=[validators.required()])
     where_lon = StringField('Lonitude:', validators=[validators.required()])
-    solar_angle = StringField('Solar Angle:', validators=[validators.required()])
     where_lon.data = "120.40"
     where_lat.data = "15:20"
 
@@ -46,8 +43,22 @@ def calc(row):
             return cos(radians(abs(row['solar_angle'] - row['sun_angle'])))
 
 
+def calc_2(solar_angle, sun_angle):
+    if solar_angle > 0 and solar_angle < 180:
 
-def big_calc_module(solar_angle, lat="15:20",long="120:40"):
+        for sa in range(0, 180, 5):
+            if abs(solar_angle - sun_angle) > 90:
+                return 0.0
+            else:
+                if solar_angle == sun_angle:
+                    return 1.0
+                else:
+                    dif = abs(solar_angle - sun_angle)
+                    return (cos(radians(abs(solar_angle - sun_angle))))
+    else:
+        return 0
+
+def big_calc_module(lat="15:20",long="120:40"):
     """
     Calculate Solar heights for 1 year
     Summerize the data - returning a dataframe, and year efficency rating
@@ -55,22 +66,27 @@ def big_calc_module(solar_angle, lat="15:20",long="120:40"):
     :return:
     """
 
+    from datetime import datetime, timedelta
+    from pytz import timezone
+    import pandas as pd
+    import ephem
+    from math import degrees, cos, radians
+
+
     fmt = "%Y-%m-%d %H:%M:%S %Z%z"
     fmt_HR = "%H:%M:%S"
-
-
-    # What Angle to use for Solar Panel
 
     # Telepayong
 
     obs = ephem.Observer()
-    obs.lat = lat
-    obs.long = long
+    obs.lat=lat
+    obs.long=long
+    #obs.lat = '15:20'
+    #obs.long = '120:40'
     sun_data = {}
-    sun_max_alt_data = {}
-
+    print("Jan 1st 2019")
     # Make timezone aware
-    date = datetime(2016, 7, 18, 0, 0, 0, tzinfo=timezone('Asia/Manila'))
+    date = datetime(2019, 1, 1, 0, 0, 0, tzinfo=timezone('Asia/Manila'))
     # For a year, per week
     for day in range(1, 366 * 24, 1):
         newday = date + timedelta(hours=day)
@@ -79,12 +95,6 @@ def big_calc_module(solar_angle, lat="15:20",long="120:40"):
         obs.date = obsday
         sun = ephem.Sun(obs)
         sun.compute(obs)
-        max_alt = 0
-        try:
-            max_alt = degrees(sun.transit_alt)
-        except:
-            pass
-
         # Convert to Local times
         utc_rise = datetime.strptime(str(sun.rise_time) + " UTC", "%Y/%m/%d %H:%M:%S %Z").astimezone(timezone('UTC'))
         pi_rise = utc_rise.astimezone(timezone('Asia/Manila'))
@@ -97,61 +107,33 @@ def big_calc_module(solar_angle, lat="15:20",long="120:40"):
                                           "set_time": pi_set.strftime(fmt_HR),
                                           "sun_angle": degrees(sun.az)
                                           }
-        sun_max_alt_data[newday.strftime(fmt)] = {"max_alt": max_alt}
-
     df_sun_data = pd.DataFrame.from_dict(sun_data, orient='index')
-    df_sun_data['Mean_Rise'] = df_sun_data.rise.mean()
-    df_sun_data['Mean_Set'] = df_sun_data.set.mean()
+
+
+
+
+
+    # Create the New Columns for Calcs
+    cols = []
+    filter = ""
+    for a in range(0, 90, 10):
+        a_str = "Angle_{}".format(a)
+        e_str = "Eff_{}".format(a)
+        df_sun_data[a_str] = a
+        df_sun_data[e_str] = 0
+        df_sun_data[e_str] = df_sun_data.apply(lambda row: calc_2(row[a_str], row['sun_angle']), axis=1)
+        print("Calculated Angle {}".format(a))
+        cols.append(e_str)
+
+    df_sun_data['loc'] = 0
     df_sun_data.index = pd.DatetimeIndex(df_sun_data.index)
+    # week_res=df_sun_data.groupby('loc').resample('W')[','.join(cols)].mean()
 
-    #
-    # Solar Efficiency
-    #
-    # Non Moving Panel
-    df_sun_data['solar_angle'] = solar_angle
-    # Use my Calculate Efficiency
-    df_sun_data['eff'] = df_sun_data.apply(calc, axis=1) * 100
+    week_res = df_sun_data.groupby('loc').resample('W')[cols].mean()
+    idx = week_res.index.droplevel(level=0)
+    week_res.index = pd.DatetimeIndex(idx)
+    return week_res,10
 
-    df_sun_max_alt_data = pd.DataFrame.from_dict(sun_max_alt_data, orient='index')
-    df_sun_max_alt_data.index = pd.DatetimeIndex(df_sun_max_alt_data.index)
-
-    mean_sun_height = df_sun_max_alt_data.max_alt.mean()
-    mean_sun_angle = df_sun_data.rise.mean() + df_sun_data.set.mean()
-    # Create Specific Data sets from sun_data
-    df_efficiecy = df_sun_data[['eff']].copy()
-    # Remove all the 0 reading - they make the graph too smooth
-    df_efficiecy = df_efficiecy[df_efficiecy.eff > 0]
-    # df_sun_rise_set_week = df_sun_data[['rise_time','set_time']]
-
-    d2 = df_efficiecy.copy()
-    # Create a dummy Col for the group by
-    # Needed due to my lack of pandas skills
-    d2['loc'] = 0
-    week_res = d2.groupby('loc').resample('W')['eff'].mean()
-    month_res = d2.groupby('loc').resample('M')['eff'].mean()
-    del d2
-
-    ### Week Efficency
-    # df_week=week_res.to_frame()
-    # df_week.reset_index(inplace=True)
-    # df_week.drop(columns=['loc'],inplace=True)
-    # df_week.columns=['when','eff']
-    # df_week.index=pd.DatetimeIndex(df_week.when)
-    # df_week.drop(columns=['when'],inplace=True)
-    # df_week.plot()
-
-    ### Month Efficency
-    df_month = month_res.to_frame()
-    df_month.reset_index(inplace=True)
-    df_month.drop(columns=['loc'], inplace=True)
-    df_month.columns = ['when', 'eff']
-    df_month.index = pd.DatetimeIndex(df_month.when)
-    df_month.drop(columns=['when'], inplace=True)
-    df_month.plot()
-
-    #print("Average efficiency for {:02d} degree panel is {:5.2f}% ".format(solar_angle,
-    #                                                                       df_month.eff.aggregate('sum') / 12))
-    return (df_month, df_month.eff.aggregate('sum') / 12)
 
 def old_calc():
     date = datetime(2016, 7, 18, 0, 0, 0)
@@ -221,13 +203,14 @@ def where():
     if request.method == 'POST':
         where_lat = request.form['where_lat']
         where_lon = request.form['where_lon']
-        solar_angle = int(request.form['solar_angle'])
+        #solar_angle = int(request.form['solar_angle'])
 
         if form.validate():
 
-            res=big_calc_module(solar_angle=solar_angle)
-            data[0]={'angle':solar_angle,
-                     'yeardf':plot_to_b64png(res[0].plot()),
+            res=big_calc_module(lat=where_lat,
+                                long=where_lon)
+
+            data[0]={'yeardf':plot_to_b64png(res[0].plot()),
                      'yearavg':res[1]}
         else:
             flash('All the form fields are required. ')

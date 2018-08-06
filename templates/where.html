@@ -17,9 +17,6 @@
                 {{ form.where_lon.label }} {{ form.where_lon }}
             </div>
 
-        <div class="input Query">
-                {{ form.solar_angle.label }} {{ form.solar_angle }}
-            </div>
 
             <div class="input submit">
                 <input type="submit" value="Submit" />
@@ -33,12 +30,11 @@
                 {%  if v["angle"] != None %}
                     <br>
                     <div style="text-align:center">
-                        For an angle of {{ v["angle"] }} degrees.
                         <p>Average Efficiency is {{ v["yearavg"] }} %
                         </p>
 
 
-                    <img src="data:image/png;base64,{{ v["yeardf"] }}">
+                    <img src="data:image/png;base64,{{ v["yeardf"] }}", width="90%">
                      </div>
 
                 {%  endif %}
